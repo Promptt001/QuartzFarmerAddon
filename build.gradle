@@ -1,10 +1,36 @@
 plugins {
-    id 'fabric-loom' version '1.7-SNAPSHOT'
+    id 'fabric-loom' version '1.14-SNAPSHOT'
 }
 
-sourceCompatibility = targetCompatibility = JavaVersion.VERSION_21
 
-archivesBaseName = project.archives_base_name
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.encoding = "UTF-8"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.encoding = 'UTF-8'
+}
+
+
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    archiveBaseName.set(project.archives_base_name)
+}
+
 version = project.mod_version
 group = project.maven_group
 
@@ -17,6 +43,8 @@ repositories {
         name = "meteor-maven-snapshots"
         url = "https://maven.meteordev.org/snapshots"
     }
+    // Useful for transitive deps.
+    mavenCentral()
 }
 
 dependencies {
@@ -31,11 +59,21 @@ dependencies {
 }
 
 processResources {
+    def propertyMap = [
+        "version"   : project.version,
+        "mc_version": project.minecraft_version
+    ]
+
+    inputs.properties(propertyMap)
+    filteringCharset = "UTF-8"
+
     filesMatching("fabric.mod.json") {
-        expand "version": project.version, "mc_version": project.minecraft_version
+        expand(propertyMap)
     }
 }
 
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding("UTF-8")
+    it.options.release = 21
+    it.options.compilerArgs.addAll(["-Xlint:deprecation", "-Xlint:unchecked"])
 }

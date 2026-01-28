@@ -15,19 +15,15 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.resource.NamespaceResourceManager;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.shape.VoxelShape;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -221,6 +217,36 @@ public class QuartzFarmer extends Module {
                 return;
             }
 
-            BlockUtils.place(target, echest, true, 0, true);
+            placeBlockCompat(target, echest);
         }
-    }}
+    }
+
+    /**
+     * Meteor's BlockUtils.place signature has changed a few times across versions.
+     * This reflective shim keeps the addon buildable across those changes.
+     */
+    private boolean placeBlockCompat(BlockPos pos, FindItemResult item) {
+        boolean swing = swingHand.get();
+
+        // Newer signature (commonly seen in addons): place(BlockPos, FindItemResult, int, boolean)
+        try {
+            Method m = BlockUtils.class.getMethod("place", BlockPos.class, FindItemResult.class, int.class, boolean.class);
+            Object res = m.invoke(null, pos, item, 0, swing);
+            return res instanceof Boolean && (Boolean) res;
+        } catch (NoSuchMethodException ignored) {
+            // Try older signature: place(BlockPos, FindItemResult, boolean, int, boolean)
+        } catch (ReflectiveOperationException e) {
+            error("Failed to place block (new signature): " + e.getClass().getSimpleName());
+            return false;
+        }
+
+        try {
+            Method m = BlockUtils.class.getMethod("place", BlockPos.class, FindItemResult.class, boolean.class, int.class, boolean.class);
+            Object res = m.invoke(null, pos, item, true, 0, swing);
+            return res instanceof Boolean && (Boolean) res;
+        } catch (ReflectiveOperationException e) {
+            error("Failed to place block (old signature): " + e.getClass().getSimpleName());
+            return false;
+        }
+    }
+}
